@@ -11,7 +11,7 @@ const Sidebar = () => {
   const menuItems = [
     { icon: <FaHome />, label: "Home", path: "/" },
     { icon: <FaHeadset />, label: "Live", path: "/live" },
-    { icon: <FaChartLine />, label: "Analytics", path: "/calls" },
+    { icon: <FaChartLine />, label: "Analytics", path: "/Analytics" },
     { icon: <FaCog />, label: "Settings", path: "/settings" },
   ];
 
