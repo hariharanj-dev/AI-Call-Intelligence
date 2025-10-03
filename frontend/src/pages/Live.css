@@ -1,0 +1,56 @@
+.live-app {
+  display: flex;
+  min-height: 100vh;
+  background: #f4f6fa;
+}
+
+.live-main {
+  margin-left: 240px;
+  padding: 40px;
+  width: 100%;
+}
+
+.live-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1976d2;
+  margin-bottom: 30px;
+}
+
+.live-controls {
+  display: flex;
+  gap: 20px;
+}
+
+.btn {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.start-btn {
+  background-color: #4caf50;
+  color: #fff;
+}
+
+.start-btn:hover {
+  background-color: #45a049;
+}
+
+.stop-btn {
+  background-color: #e91e63;
+  color: #fff;
+}
+
+.stop-btn:hover {
+  background-color: #d81b60;
+}
+
+.error-text {
+  color: red;
+  margin-top: 15px;
+}
