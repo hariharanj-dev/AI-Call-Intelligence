@@ -1,10 +1,9 @@
-
 import express from "express";
 import multer from "multer";
 import fs from "fs";
 import cors from "cors";
-import axios from "axios";
 import dotenv from "dotenv";
+import { createClient } from "@deepgram/sdk";
 
 dotenv.config();
 
@@ -14,69 +13,74 @@ const upload = multer({ dest: "uploads/" });
 app.use(cors());
 app.use(express.json());
 
-const ASSEMBLY_API_KEY = process.env.ASSEMBLYAI_API_KEY;
+if (!process.env.DEEPGRAM_API_KEY) {
+  console.error("Error: DEEPGRAM_API_KEY is not set in your .env file.");
+  process.exit(1);
+}
+
+const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
 app.post("/upload", upload.single("file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded." });
+  }
 
   const filePath = req.file.path;
 
   try {
+    const fileBuffer = fs.readFileSync(filePath);
 
-    const fileData = fs.readFileSync(filePath);
-    const uploadResp = await axios.post(
-      "https://api.assemblyai.com/v2/upload",
-      fileData,
+    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+      fileBuffer,
       {
-        headers: {
-          authorization: ASSEMBLY_API_KEY,
-          "Content-Type": "application/octet-stream",
-        },
+        diarize: true,
+        punctuate: true,
+        smart_format: true,
+        paragraphs: true,
+        speaker_count: 2,
+        language: req.body.language || "en-US",
       }
     );
 
-    const audioUrl = uploadResp.data.upload_url;
-
-    const transResp = await axios.post(
-      "https://api.assemblyai.com/v2/transcript",
-      { audio_url: audioUrl, language_code: req.body.language || "en" },
-      { headers: { authorization: ASSEMBLY_API_KEY } }
-    );
-
-    const transcriptId = transResp.data.id;
-
+    if (error) {
+      throw error;
+    }
 
     let transcriptText = "";
-    while (true) {
-      const resultResp = await axios.get(
-        `https://api.assemblyai.com/v2/transcript/${transcriptId}`,
-        { headers: { authorization: ASSEMBLY_API_KEY } }
-      );
-
-      if (resultResp.data.status === "completed") {
-        transcriptText = resultResp.data.text;
-        break;
-      } else if (resultResp.data.status === "failed") {
-        throw new Error("Transcription failed");
-      }
-      await new Promise((r) => setTimeout(r, 2000));
+    if (result.results?.channels[0]?.alternatives[0]?.paragraphs) {
+      const paragraphs = result.results.channels[0].alternatives[0].paragraphs.paragraphs;
+      
+      transcriptText = paragraphs
+        .map(p => {
+          const speaker = `Speaker ${p.speaker}`;
+          const text = p.sentences.map(s => s.text).join(" ");
+          return `${speaker}: ${text}`;
+        })
+        .join("\n"); // This correctly puts each speaker turn on a new line
+    } else {
+      transcriptText = result.results?.channels[0]?.alternatives[0]?.transcript || "No transcript generated.";
     }
 
     fs.unlinkSync(filePath);
 
     res.json({
       transcript: transcriptText,
-      decisionGraph: {},
-      talkRatio: {},
-      emotionTimeline: {},
+      rawResponse: result,
     });
+
   } catch (err) {
-    console.error("Error during transcription:", err.message);
-    fs.unlinkSync(filePath);
-    res.status(500).json({ error: "Failed to process audio" });
+    console.error("Error during transcription:", err);
+    console.error("Full Deepgram Error:", err.message);
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    res.status(500).json({ error: "Failed to process audio file.", details: err.message });
   }
 });
 
 app.listen(process.env.PORT || 5000, () => {
   console.log(`Server running on port ${process.env.PORT || 5000}`);
+
 });
